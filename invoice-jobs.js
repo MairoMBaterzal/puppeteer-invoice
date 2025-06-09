@@ -40,9 +40,22 @@ app.post('/run', async (req, res) => {
       await page.click('button[onclick*="createInvoiceFromClosedJob"]');
       console.log('✅ Clicked Invoice button');
 
-      // Wait for modal and click "Invoice Now"
-      await page.waitForSelector('button.jquery-msgbox-button-submit', { timeout: 5000 });
-      await page.click('button.jquery-msgbox-button-submit');
+      // Wait for modal to be visible
+      await page.waitForSelector('button.jquery-msgbox-button-submit', {
+        visible: true,
+        timeout: 10000
+      });
+
+      // Slight delay for animations
+      await page.waitForTimeout(500);
+
+      // Click "Invoice Now" by matching text
+      await page.evaluate(() => {
+        const buttons = [...document.querySelectorAll('button.jquery-msgbox-button-submit')];
+        const confirmBtn = buttons.find(btn => btn.textContent.trim() === 'Invoice Now');
+        if (confirmBtn) confirmBtn.click();
+      });
+
       console.log('🎉 Clicked Invoice Now to confirm');
 
     } catch (e) {
