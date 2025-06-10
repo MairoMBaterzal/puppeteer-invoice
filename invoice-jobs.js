@@ -10,7 +10,7 @@ app.post('/run', async (req, res) => {
   console.log('📦 Received jobs:', jobsToInvoice);
 
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true, // Set to true for Railway, false for local testing
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
@@ -34,27 +34,28 @@ app.post('/run', async (req, res) => {
     await page.goto(url, { waitUntil: 'networkidle2' });
 
     try {
+      // Click invoice button
       await page.waitForSelector('button[onclick*="createInvoiceFromClosedJob"]', { timeout: 5000 });
       await page.click('button[onclick*="createInvoiceFromClosedJob"]');
       console.log('✅ Clicked Invoice button');
 
-      await page.waitForFunction(() => {
-        return [...document.querySelectorAll('button')].some(b => b.textContent.includes('Invoice Now'));
-      }, { timeout: 5000 });
+      // Wait for modal to appear and click "Invoice Now"
+      await page.waitForSelector('button.jquery-msgbox-button-submit', { visible: true, timeout: 5000 });
+      await page.evaluate(() => {
+        const buttons = [...document.querySelectorAll('button.jquery-msgbox-button-submit')];
+        const invoiceNowBtn = buttons.find(btn => btn.textContent.includes('Invoice Now'));
+        if (invoiceNowBtn) invoiceNowBtn.click();
+      });
+      console.log('🎉 Clicked Invoice Now');
 
-      const buttons = await page.$x("//button[contains(text(), 'Invoice Now')]");
-      if (buttons.length > 0) {
-        await buttons[0].click();
-        console.log('🎉 Clicked Invoice Now to confirm');
-      } else {
-        throw new Error('Invoice Now button not found');
-      }
-
+      // Wait for 10 seconds for confirmation
       await new Promise(resolve => setTimeout(resolve, 10000));
+
     } catch (e) {
       console.log('❌ Could not complete invoice process:', e.message);
     }
 
+    // Delay between jobs
     await new Promise(resolve => setTimeout(resolve, 3000));
   }
 
@@ -62,6 +63,7 @@ app.post('/run', async (req, res) => {
   res.send({ message: '🎉 All jobs processed!' });
 });
 
+// Run server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Puppeteer server listening on http://localhost:${PORT}/run`);
